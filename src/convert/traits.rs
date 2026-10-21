@@ -598,7 +598,8 @@ impl_tuple_upcast!([T1 T2 T3 T4 T5 T6 T7 T8] [Target1 Target2 Target3 Target4 Ta
 ///
 /// It also carries the ABI conversion traits every such type implements, so
 /// generic code bounded by `JsGeneric` alone can pass `T` and `&T` to
-/// `experimental_generic_mono` imports.
+/// `experimental_generic_mono` imports. Its `IntoWasmAbi::Abi` is bounded to a
+/// single value, so `Result<T, E>` callback returns cross too.
 ///
 /// # When to Use
 ///
@@ -630,6 +631,7 @@ pub trait JsGeneric:
     + Upcast<JsValue>
     + JsCast
     + MonoGeneric
+    + IntoWasmAbi<Abi: WasmAbi<Prim3 = (), Prim4 = ()>>
     + OptionFromWasmAbi
     + VectorRefIntoWasmAbi
 {
@@ -641,6 +643,7 @@ impl<T> JsGeneric for T where
         + Upcast<JsValue>
         + JsCast
         + MonoGeneric
+        + IntoWasmAbi<Abi: WasmAbi<Prim3 = (), Prim4 = ()>>
         + OptionFromWasmAbi
         + VectorRefIntoWasmAbi
 {
