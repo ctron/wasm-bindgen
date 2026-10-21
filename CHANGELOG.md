@@ -13,6 +13,20 @@
   cloning and dropping them is free and never calls into JS.
   [#5401](https://github.com/wasm-bindgen/wasm-bindgen/pull/5401)
 
+* Stabilized the `js_sys::Temporal` bindings and `Date::to_temporal_instant`,
+  previously behind `js_sys_unstable_apis`, now that Temporal is Stage 4. The
+  bindings were reviewed against the final specification: bindings for the
+  removed `toPlainYearMonth`/`toPlainMonthDay` on `PlainDateTime` and
+  `ZonedDateTime`, `ZonedDateTime::with_plain_date` and
+  `PlainTime::to_plain_date_time` are gone, `offset_nanoseconds` returns `f64`,
+  `era`, `era_year`, `week_of_year` and `year_of_week` return `Option`s,
+  `fractionalSecondDigits` is a `u8`, `get_time_zone_transition` returns
+  `Result<Option<ZonedDateTime>, JsValue>`, `toString` has a plain
+  `to_js_string()` and a fallible `to_js_string_with_options()`, time zones are
+  passed as `&str`, constructors take the calendar through `new_with_calendar`
+  overloads, and the unit enums are `TemporalUnit` and `LargestUnit`.
+  [#5402](https://github.com/wasm-bindgen/wasm-bindgen/pull/5402)
+
 * Added the `slice = view | copy | array` and `vec = copy | array`
   attributes for imported JS functions, choosing what JS receives for a
   sequence argument with numeric elements: a live typed array over wasm
