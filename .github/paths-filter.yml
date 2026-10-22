@@ -1,0 +1,136 @@
+# Which files each CI job depends on. The `changes` job in main.yml evaluates
+# these against a pull request's changed files, and a job runs only when its
+# filter matched; pushes and manual runs skip the filtering and run everything.
+# The crate groups follow the path dependencies in the Cargo manifests,
+# including dev-dependencies, since those are compiled for a crate's tests.
+
+# Every filter: the CI definition itself, and never documentation.
+base: &base
+  - .github/workflows/main.yml
+  - .github/paths-filter.yml
+  - '!**/*.md'
+  - '!**/LICENSE-*'
+
+# wasm-bindgen itself, its proc macro, and the workspace manifests.
+bindgen: &bindgen
+  - *base
+  - Cargo.toml
+  - Cargo.lock
+  - .cargo/**
+  - build.rs
+  - src/**
+  - crates/macro/**
+  - crates/macro-support/**
+  - crates/shared/**
+test: &test
+  - crates/test/**
+  - crates/test-macro/**
+  - crates/test-shared/**
+# The CLI, which is also the test runner for every wasm test.
+cli: &cli
+  - crates/cli/**
+  - crates/cli-support/**
+js-sys: &js-sys
+  - crates/js-sys/**
+futures: &futures
+  - crates/futures/**
+web-sys: &web-sys
+  - crates/web-sys/**
+webidl-crate: &webidl-crate
+  - crates/webidl/**
+
+# The library crates. js-sys, wasm-bindgen-macro and wasm-bindgen-test all
+# have web-sys as a dev-dependency, so their tests depend on it too.
+lib-crates: &lib-crates
+  - *bindgen
+  - *test
+  - *js-sys
+  - *futures
+  - *web-sys
+# test_with_geckodriver (web-sys and js-sys)
+libs: &libs
+  - *lib-crates
+  - *cli
+
+# rustfmt
+rustfmt:
+  - *base
+  - '**/*.rs'
+# taplo
+taplo:
+  - *base
+  - '**/*.toml'
+# clippy, clippy_wasm, clippy_wasm_no_std
+clippy:
+  - *base
+  - '**/*.rs'
+  - '**/Cargo.toml'
+  - Cargo.lock
+  - .cargo/**
+  - clippy.toml
+# test_wasm_bindgen, test_wasm_bindgen_custom, test_wasm64,
+# test_wasm_bindgen_unwind_legacy_eh, test_wasm_bindgen_unwind_exnref_eh,
+# test_emscripten
+wasm-bindgen:
+  - *bindgen
+  - *test
+  - *cli
+  - *js-sys
+  - *futures
+  - tests/**
+# test_native: the CLI reference tests build projects against web-sys.
+native:
+  - *libs
+  - tests/**
+# test_cli_reference_typescript
+reference:
+  - *base
+  - crates/cli/tests/reference/**
+# test_with_geckodriver (wasm-bindgen-webidl), build_webidl
+webidl:
+  - *base
+  - Cargo.toml
+  - Cargo.lock
+  - *webidl-crate
+  - *web-sys
+# test_with_geckodriver (webidl-tests)
+webidl-tests:
+  - *bindgen
+  - *test
+  - *cli
+  - *js-sys
+  - *futures
+  - *webidl-crate
+  - crates/webidl-tests/**
+# test_with_geckodriver (typescript-tests)
+typescript-tests:
+  - *libs
+  - crates/typescript-tests/**
+# test_ui
+ui: *lib-crates
+# build_examples, test_examples
+examples:
+  - *libs
+  - examples/**
+# build_benchmarks
+benchmarks:
+  - *libs
+  - benchmarks/**
+# msrv-lib, msrv-resolver
+msrv-lib:
+  - *lib-crates
+  - crates/msrv/**
+# msrv-cli
+msrv-cli:
+  - *base
+  - *cli
+  - crates/shared/**
+  - crates/test-shared/**
+  - crates/msrv/**
+# codecov.yml: `just cov`, which tests wasm-bindgen-test and so builds web-sys.
+coverage:
+  - *libs
+  - tests/**
+  - justfile
+  - codecov.yml
+  - .github/workflows/codecov.yml

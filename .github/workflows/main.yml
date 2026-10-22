@@ -21,8 +21,45 @@ permissions:
   contents: read #  to fetch code (actions/checkout)
 
 jobs:
+  # Which of the filters in .github/paths-filter.yml a pull request's changed
+  # files match; each job below runs only when its filter did. Pushes and
+  # manual runs always run everything.
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      libs: ${{ github.event_name != 'pull_request' || steps.filter.outputs.libs == 'true' }}
+      rustfmt: ${{ github.event_name != 'pull_request' || steps.filter.outputs.rustfmt == 'true' }}
+      taplo: ${{ github.event_name != 'pull_request' || steps.filter.outputs.taplo == 'true' }}
+      clippy: ${{ github.event_name != 'pull_request' || steps.filter.outputs.clippy == 'true' }}
+      wasm-bindgen: ${{ github.event_name != 'pull_request' || steps.filter.outputs.wasm-bindgen == 'true' }}
+      native: ${{ github.event_name != 'pull_request' || steps.filter.outputs.native == 'true' }}
+      reference: ${{ github.event_name != 'pull_request' || steps.filter.outputs.reference == 'true' }}
+      webidl: ${{ github.event_name != 'pull_request' || steps.filter.outputs.webidl == 'true' }}
+      webidl-tests: ${{ github.event_name != 'pull_request' || steps.filter.outputs.webidl-tests == 'true' }}
+      typescript-tests: ${{ github.event_name != 'pull_request' || steps.filter.outputs.typescript-tests == 'true' }}
+      ui: ${{ github.event_name != 'pull_request' || steps.filter.outputs.ui == 'true' }}
+      examples: ${{ github.event_name != 'pull_request' || steps.filter.outputs.examples == 'true' }}
+      benchmarks: ${{ github.event_name != 'pull_request' || steps.filter.outputs.benchmarks == 'true' }}
+      msrv-lib: ${{ github.event_name != 'pull_request' || steps.filter.outputs.msrv-lib == 'true' }}
+      msrv-cli: ${{ github.event_name != 'pull_request' || steps.filter.outputs.msrv-cli == 'true' }}
+    steps:
+    - uses: actions/checkout@v7
+      if: github.event_name == 'pull_request'
+    - uses: dorny/paths-filter@v4
+      id: filter
+      if: github.event_name == 'pull_request'
+      with:
+        filters: .github/paths-filter.yml
+        predicate-quantifier: some-with-excludes
+
   # Check Code style quickly by running `rustfmt` over all code
   rustfmt:
+    needs: changes
+    if: needs.changes.outputs.rustfmt == 'true'
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
@@ -34,6 +71,8 @@ jobs:
 
   # Check TOML style by using Taplo.
   taplo:
+    needs: changes
+    if: needs.changes.outputs.taplo == 'true'
     name: Taplo
 
     runs-on: ubuntu-latest
@@ -47,6 +86,8 @@ jobs:
 
   # Run `cargo clippy` over everything
   clippy:
+    needs: changes
+    if: needs.changes.outputs.clippy == 'true'
     name: Clippy (native)
     runs-on: ubuntu-latest
     steps:
@@ -58,6 +99,8 @@ jobs:
 
   # Run `cargo clippy` over all Wasm crates
   clippy_wasm:
+    needs: changes
+    if: needs.changes.outputs.clippy == 'true'
     name: Clippy (Wasm)
     runs-on: ubuntu-latest
     steps:
@@ -76,6 +119,8 @@ jobs:
 
   # Run `cargo clippy` over crates that support `no_std`
   clippy_wasm_no_std:
+    needs: changes
+    if: needs.changes.outputs.clippy == 'true'
     strategy:
       matrix:
         include:
@@ -101,6 +146,8 @@ jobs:
         -- -D warnings
 
   test_wasm_bindgen:
+    needs: changes
+    if: needs.changes.outputs.wasm-bindgen == 'true'
     strategy:
       matrix:
         runs:
@@ -129,6 +176,8 @@ jobs:
     - run: ${{ matrix.runs.run }}
 
   test_wasm_bindgen_custom:
+    needs: changes
+    if: needs.changes.outputs.wasm-bindgen == 'true'
     strategy:
       matrix:
         envs:
@@ -153,6 +202,8 @@ jobs:
     - run: cargo test --target wasm32-unknown-unknown -Zbuild-std=std,panic_abort --config="target.wasm32-unknown-unknown.rustflags='${{ matrix.envs.RUSTFLAGS }}'"
 
   test_wasm64:
+    needs: changes
+    if: needs.changes.outputs.wasm-bindgen == 'true'
     name: "Run wasm-bindgen crate tests (wasm64)"
     runs-on: ubuntu-latest
     env:
@@ -168,6 +219,8 @@ jobs:
     - run: cargo test --target wasm64-unknown-unknown -Zbuild-std=std,panic_abort
 
   test_wasm_bindgen_unwind_legacy_eh:
+    needs: changes
+    if: needs.changes.outputs.wasm-bindgen == 'true'
     name: "Run wasm-bindgen crate tests with panic=unwind with legacy eh"
     runs-on: ubuntu-latest
     env:
@@ -194,6 +247,8 @@ jobs:
     - run: cargo test --target wasm32-unknown-unknown -Zbuild-std --lib --bins --tests
     - run: cargo test --target wasm32-unknown-unknown -Zbuild-std --test wasm --features std,wasm-bindgen-futures/std
   test_wasm_bindgen_unwind_exnref_eh:
+    needs: changes
+    if: needs.changes.outputs.wasm-bindgen == 'true'
     name: "Run wasm-bindgen crate tests with panic=unwind with exnref eh"
     runs-on: ubuntu-latest
     env:
@@ -217,6 +272,8 @@ jobs:
     - run: cargo test --target wasm32-unknown-unknown -Zbuild-std --test wasm --features std,wasm-bindgen-futures/std
   
   test_emscripten:
+      needs: changes
+      if: needs.changes.outputs.wasm-bindgen == 'true'
       name: Run Emscripten tests
       runs-on: ubuntu-latest
       steps:
@@ -279,6 +336,8 @@ jobs:
 
   # This checks that the output of the CLI is actually valid JavaScript and TypeScript
   test_cli_reference_typescript:
+    needs: changes
+    if: needs.changes.outputs.reference == 'true'
     name: Run CLI reference TypeScript check
     runs-on: ubuntu-latest
     steps:
@@ -294,6 +353,8 @@ jobs:
       run: tsc --noEmit --skipLibCheck --lib esnext,dom --module esnext --allowJs $(find crates/cli/tests/reference -maxdepth 1 -name '*.js' ! -name '*target-module*.js')
 
   test_native:
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
     name: Run native tests
     runs-on: ubuntu-latest
     steps:
@@ -325,67 +386,88 @@ jobs:
     - run: cargo test -p wasm-bindgen-test-shared
 
   test_with_geckodriver:
+    needs: changes
     strategy:
       matrix:
         runs:
           - name: "web-sys"
+            filter: libs
             run: |
               cargo build --manifest-path crates/web-sys/Cargo.toml --target wasm32-unknown-unknown
               cargo build --manifest-path crates/web-sys/Cargo.toml --target wasm32-unknown-unknown --features Node
               cargo build --manifest-path crates/web-sys/Cargo.toml --target wasm32-unknown-unknown --features Element
               cargo build --manifest-path crates/web-sys/Cargo.toml --target wasm32-unknown-unknown --features Window
           - name: "web-sys (all features)"
+            filter: libs
             run: cargo test --manifest-path crates/web-sys/Cargo.toml --target wasm32-unknown-unknown --all-features
           - name: "web-sys (unstable, all features)"
+            filter: libs
             run: cargo test --manifest-path crates/web-sys/Cargo.toml --target wasm32-unknown-unknown --all-features
             env:
               RUSTFLAGS: --cfg=web_sys_unstable_apis
           - name: "web-sys (next-unstable, all features)"
+            filter: libs
             run: cargo test --manifest-path crates/web-sys/Cargo.toml --target wasm32-unknown-unknown --all-features
             env:
               RUSTFLAGS: --cfg=web_sys_unstable_apis --cfg=wbg_next_unstable
           - name: "js-sys"
+            filter: libs
             run: cargo test -p js-sys --features=unsafe-eval --target wasm32-unknown-unknown
           - name: "js-sys (unstable)"
+            filter: libs
             run: cargo test -p js-sys --features=unsafe-eval --target wasm32-unknown-unknown
             env:
               RUSTFLAGS: --cfg=js_sys_unstable_apis
           - name: "js-sys (next-unstable)"
+            filter: libs
             run: cargo test -p js-sys --features=unsafe-eval --target wasm32-unknown-unknown
             env:
               RUSTFLAGS: --cfg=js_sys_unstable_apis --cfg=wbg_next_unstable
           - name: "wasm-bindgen-webidl"
+            filter: webidl
             run: cargo test -p wasm-bindgen-webidl
           - name: "webidl-tests"
+            filter: webidl-tests
             run: cargo test -p webidl-tests --target wasm32-unknown-unknown
           - name: "webidl-tests (unstable)"
+            filter: webidl-tests
             run: cargo test -p webidl-tests --target wasm32-unknown-unknown
             env:
               RUSTFLAGS: --cfg=web_sys_unstable_apis
           - name: "webidl-tests (next)"
+            filter: webidl-tests
             run: cargo test -p webidl-tests --target wasm32-unknown-unknown
             env:
               RUSTFLAGS: --cfg=web_sys_unstable_apis --cfg=wbg_next_unstable
               WBG_NEXT_UNSTABLE: "1"
           - name: "typescript-tests"
+            filter: typescript-tests
             run: cd crates/typescript-tests && ./run.sh
     name: "Run ${{ matrix.runs.name }} tests (with geckodriver)"
     env:
       RUSTFLAGS: ${{ matrix.runs.env.RUSTFLAGS }}
       WBG_NEXT_UNSTABLE: ${{ matrix.runs.env.WBG_NEXT_UNSTABLE }}
+      # A job's `if` can't see the matrix, so each entry's filter gates its steps.
+      RUN: ${{ needs.changes.outputs[matrix.runs.filter] }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
+      if: env.RUN == 'true'
     - uses: dtolnay/rust-toolchain@stable
+      if: env.RUN == 'true'
       with:
         targets: wasm32-unknown-unknown
         components: rustfmt
     - uses: actions/setup-node@v7
+      if: env.RUN == 'true'
       with:
         node-version: '20'
     - run: ${{ matrix.runs.run }}
+      if: env.RUN == 'true'
 
   test_ui:
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
     name: Run UI compile-fail tests
     runs-on: ubuntu-latest
     steps:
@@ -395,6 +477,8 @@ jobs:
     - run: cargo test -p wasm-bindgen-test-macro
 
   build_webidl:
+    needs: changes
+    if: needs.changes.outputs.webidl == 'true'
     name: "Verify that web-sys is compiled correctly"
     runs-on: ubuntu-latest
     steps:
@@ -406,6 +490,8 @@ jobs:
     - run: git diff --exit-code
 
   build_examples:
+    needs: changes
+    if: needs.changes.outputs.examples == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
@@ -457,6 +543,8 @@ jobs:
         PREBUILT_EXAMPLES: 1
 
   build_benchmarks:
+    needs: changes
+    if: needs.changes.outputs.benchmarks == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
@@ -627,6 +715,8 @@ jobs:
         path: docs.tar.gz
 
   msrv-resolver:
+    needs: changes
+    if: needs.changes.outputs.msrv-lib == 'true'
     name: Check feature resolver version 1 compatibility
     runs-on: ubuntu-latest
     strategy:
@@ -653,6 +743,8 @@ jobs:
     - run: cargo build --target ${{ matrix.target }} ${{ matrix.features }}
 
   msrv-lib:
+    needs: changes
+    if: needs.changes.outputs.msrv-lib == 'true'
     name: Check MSRV for libraries
     runs-on: ubuntu-latest
     strategy:
@@ -679,6 +771,8 @@ jobs:
     - run: cargo build --target ${{ matrix.target }} ${{ matrix.features }}
 
   msrv-cli:
+    needs: changes
+    if: needs.changes.outputs.msrv-cli == 'true'
     name: Check MSRV for CLI tools
     runs-on: ubuntu-latest
     defaults:

@@ -10,8 +10,27 @@ permissions:
   id-token: write
 
 jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      coverage: ${{ github.event_name != 'pull_request' || steps.filter.outputs.coverage == 'true' }}
+    steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'pull_request'
+      - uses: dorny/paths-filter@v4
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: .github/paths-filter.yml
+          predicate-quantifier: some-with-excludes
+
   coverage:
-    if: github.event_name == 'pull_request' || github.repository == 'wasm-bindgen/wasm-bindgen'
+    needs: changes
+    if: needs.changes.outputs.coverage == 'true' && (github.event_name == 'pull_request' || github.repository == 'wasm-bindgen/wasm-bindgen')
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always
